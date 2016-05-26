@@ -2,6 +2,7 @@ package com.flatironschool.javacs;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 
 import org.jsoup.nodes.Element;
@@ -28,24 +29,78 @@ public class WikiPhilosophy {
 	 * @throws IOException
 	 */
 	public static void main(String[] args) throws IOException {
-		
-        // some example code to get you started
 
+		List<String> visited = new ArrayList<String>();
 		String url = "https://en.wikipedia.org/wiki/Java_(programming_language)";
-		Elements paragraphs = wf.fetchWikipedia(url);
 
-		Element firstPara = paragraphs.get(0);
-		
-		Iterable<Node> iter = new WikiNodeIterable(firstPara);
-		for (Node node: iter) {
-			if (node instanceof TextNode) {
-				System.out.print(node);
+		while (true) {
+			visited.add(url);
+			url = getFirstLink(url);
+			if (url == null) {
+				System.out.println("Failed! The page has no links.");
+				return;
 			}
-        }
+			if (visited.contains(url)) {
+				System.out.println("Failed! Got stuck in a loop.");
+				return;
+			}
+			if (url.equals("https://en.wikipedia.org/wiki/Philosophy")) {
+				// +1 to include the Philosophy page.
+				System.out.println("Success! Got to Philosophy after visiting " + (visited.size() + 1) + " pages.");
+				return;
+			}
+		}
 
-        // the following throws an exception so the test fails
-        // until you update the code
-        String msg = "Complete this lab by adding your code and removing this statement.";
-        throw new UnsupportedOperationException(msg);
+	}
+
+
+	private static String getFirstLink(String url) throws IOException {
+		Elements paragraphs = wf.fetchWikipedia(url);
+		int openParen = 0;
+		int closingParen = 0;
+
+		for (Element paragraph: paragraphs) {
+			Iterable<Node> iter = new WikiNodeIterable(paragraph);
+
+			for (Node node: iter) {
+
+				// To keep number of open and closed parenthesis
+				if (node instanceof TextNode) {
+					String text = ((TextNode) node).text();
+					for (int i = 0; i < text.length(); i++) {
+						if (text.charAt(i) == '(') {
+							openParen++;
+						} else if (text.charAt(i) == ')') {
+							closingParen++;
+						}
+					}
+				}
+
+				// If there is a link and it is not inside a parenthesis and it is not italicized
+				if (node instanceof Element && ((Element) node).tagName().equals("a") && openParen <= closingParen &&
+						!isItalicized(node)) {
+					String link = ((Element) node).attr("href");
+					if (link.length() > 6 && link.substring(0, 6).equals("/wiki/")) {
+						return "https://en.wikipedia.org" + link;
+					}
+				}
+
+			}
+		}
+		return null;
+	}
+
+
+	private static Boolean isItalicized(Node node) {
+		Boolean isItalicized = false;
+		Node parent = node.parent();
+		while (parent != null && !isItalicized) {
+			if (parent instanceof Element && ((Element) parent).tagName().equals("i")) {
+				isItalicized = true;
+			} else {
+				parent = parent.parent();
+			}
+		}
+		return isItalicized;
 	}
 }
